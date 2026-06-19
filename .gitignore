@@ -1,0 +1,4 @@
+wp-rss-aggregator
+.agents/*
+node_modules
+.claude
