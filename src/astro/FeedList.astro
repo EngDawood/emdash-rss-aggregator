@@ -1,0 +1,169 @@
+---
+import { getEmDashCollection } from "emdash";
+import FeedItem from "./FeedItem.astro";
+import type { Display } from "../types";
+
+interface Props {
+	displayId?: string;
+	limit?: number;
+	sourceId?: string;
+	tag?: string;
+}
+
+const { displayId = "default", limit, sourceId, tag } = Astro.props;
+
+let items: any[] = [];
+let display: Display = {
+	name: "Default",
+	sources: [],
+	excludeSources: [],
+	tags: [],
+	layout: "list",
+	numItems: 15,
+	enablePagination: false,
+	paginationStyle: "numbered",
+	enableTitles: true,
+	titleMaxLength: 0,
+	linkTitles: true,
+	enableSources: true,
+	sourcePrefix: "",
+	linkSource: true,
+	enableDates: true,
+	datePrefix: "",
+	dateFormat: "F j, Y",
+	useRelativeDate: true,
+	enableAuthors: false,
+	authorPrefix: "By ",
+	linkTarget: "_blank",
+	linksNoFollow: true,
+	linkToEmbeds: false,
+	enableExcerpts: true,
+	excerptMaxWords: 55,
+	excerptEllipsis: "...",
+	enableReadMore: true,
+	readMoreText: "Read more",
+	enableImages: true,
+	linkImages: true,
+	imageWidth: 120,
+	imageHeight: 120,
+	fallbackToSourceImage: true,
+	gridMaxColumns: 3,
+	gridUseImageAsBg: false,
+	gridFitImages: true,
+	gridEnableEmbeds: false,
+	enableAudioPlayer: false,
+	audioPlayerPosition: "after",
+	enableBullets: false,
+	bulletStyle: "disc",
+	createdAt: "",
+	updatedAt: "",
+};
+
+try {
+	// Attempt to query via plugin public API to get custom display rules & items
+	const url = new URL("/api/plugins/rss-aggregator/public/items", Astro.url.origin);
+	url.searchParams.set("display", displayId);
+	if (limit) url.searchParams.set("limit", String(limit));
+	if (sourceId) url.searchParams.set("source", sourceId);
+	if (tag) url.searchParams.set("tag", tag);
+
+	const res = await fetch(url.toString());
+	if (res.ok) {
+		const data = await res.json();
+		items = data.items || [];
+		if (data.display) {
+			display = data.display;
+		}
+	} else {
+		throw new Error(`HTTP ${res.status}`);
+	}
+} catch (err) {
+	// Fallback to direct collection query in case API endpoint is unavailable (e.g. SSG build time)
+	const queryOptions: any = {
+		limit: limit || 15,
+		orderBy: { publishedAt: "desc" },
+	};
+	if (sourceId) {
+		queryOptions.where = { sourceId };
+	}
+
+	const { entries } = await getEmDashCollection("feed-items", queryOptions);
+	items = entries.map((e) => e.data) || [];
+}
+---
+
+{items.length === 0 ? (
+	<div class="rss-empty-state">
+		<p>No feed items available at this time.</p>
+	</div>
+) : (
+	<div class={`rss-list-container ${display.layout}-layout-container`}>
+		{display.enableBullets ? (
+			<ul class={`rss-bullets-list bullet-type-${display.bulletStyle || 'disc'}`}>
+				{items.map((item) => (
+					<li>
+						<FeedItem item={item} display={display} />
+					</li>
+				))}
+			</ul>
+		) : (
+			<div 
+				class={`rss-feed-wrapper layout-${display.layout}`}
+				style={display.layout === 'grid' ? `--grid-cols: ${display.gridMaxColumns || 3}` : ''}
+			>
+				{items.map((item) => (
+					<FeedItem item={item} display={display} />
+				))}
+			</div>
+		)}
+	</div>
+)}
+
+<style>
+	.rss-empty-state {
+		text-align: center;
+		padding: 40px 20px;
+		color: #6b7280;
+		border: 1px dashed #e5e7eb;
+		border-radius: 12px;
+		background: #f9fafb;
+	}
+
+	.rss-list-container {
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	/* Bullets list styles */
+	.rss-bullets-list {
+		padding-left: 20px;
+		margin: 0;
+	}
+	.bullet-type-disc { list-style-type: disc; }
+	.bullet-type-circle { list-style-type: circle; }
+	.bullet-type-square { list-style-type: square; }
+	.bullet-type-none { list-style-type: none; padding-left: 0; }
+
+	.rss-bullets-list li {
+		margin-bottom: 16px;
+	}
+
+	/* Grid and list layout wrapper styles */
+	.rss-feed-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		width: 100%;
+	}
+
+	.layout-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(max(260px, calc(100% / var(--grid-cols) - 20px)), 1fr));
+		gap: 20px;
+	}
+
+	/* Layout specific container overrides */
+	.grid-layout-container {
+		padding: 4px;
+	}
+</style>

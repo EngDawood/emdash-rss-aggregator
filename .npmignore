@@ -1,0 +1,15 @@
+# Local development files
+node_modules/
+dist/
+*.tgz
+tsconfig.json
+.npmrc
+
+# Workspace / Agent logs
+.agents/
+.claude/
+.gitignore
+.mcp.json
+
+# WordPress source code (original)
+wp-rss-aggregator/
