@@ -4,7 +4,7 @@ An RSS and Atom feed aggregator plugin for **EmDash CMS** on **Astro**. Automati
 
 Features both standard aggregation and premium features (like Feed-to-Post conversion, keyword filtering, YouTube detection, and custom audio players).
 
----
+--- 
 
 ## Features
 
