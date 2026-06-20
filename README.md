@@ -1,6 +1,6 @@
 # emdash-rss-aggregator
 
-[![npm version](https://img.shields.io/npm/v/emdash-rss-aggregator.svg)](https://www.npmjs.com/package/emdash-rss-aggregator)
+[![npm version](https://img.shields.io/npm/v/@dawod/emdash-rss-aggregator.svg)](https://www.npmjs.com/package/@dawod/emdash-rss-aggregator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Astro](https://img.shields.io/badge/Built%20with-Astro-ff5d01.svg)](https://astro.build/)
 [![CMS-EmDash](https://img.shields.io/badge/CMS-EmDash-blue.svg)](https://github.com/emdash-cms/emdash)
