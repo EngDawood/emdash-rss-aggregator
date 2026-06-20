@@ -3,7 +3,6 @@ name: Publish to npm
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   publish:
@@ -20,7 +19,7 @@ jobs:
         with:
           version: 9
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -29,6 +28,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Sync version from release tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version
 
       - name: Publish to npm
         run: pnpm publish --no-git-checks --access public
