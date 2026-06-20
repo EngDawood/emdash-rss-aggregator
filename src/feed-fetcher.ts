@@ -1,5 +1,5 @@
 /**
- * @dawod/emdash-rss-aggregator
+ * emdash-rss-aggregator
  *
  * Import pipeline that fetches feed, parses items, filters them,
  * deduplicates against database, and syncs them to storage and content collections.
@@ -255,11 +255,11 @@ export async function fetchAndImportFeed(
 				try {
 					if (contentId) {
 						// Update CMS entry
-						await ctx.content.update(collectionName, contentId, feedItemData);
+						await ctx.content.update?.(collectionName, contentId, feedItemData);
 					} else {
 						// Create CMS entry
-						const contentEntry = await ctx.content.create(collectionName, feedItemData);
-						contentId = contentEntry.id;
+						const contentEntry = await ctx.content.create?.(collectionName, feedItemData);
+						contentId = contentEntry?.id;
 					}
 				} catch (contentErr) {
 					ctx.log.warn("Failed to sync content entry for feed item", { guid: parsed.guid, error: String(contentErr) });
@@ -284,7 +284,7 @@ export async function fetchAndImportFeed(
 						},
 					};
 					// Create content in custom postCollection
-					await ctx.content.create(source.postCollection, postData);
+					await ctx.content.create?.(source.postCollection, postData);
 				} catch (postErr) {
 					ctx.log.warn("Failed to create post content for Feed-to-Post", { guid: parsed.guid, collection: source.postCollection, error: String(postErr) });
 				}
@@ -320,7 +320,7 @@ export async function fetchAndImportFeed(
 					const itemData = item.data as any;
 					if (itemData.contentId && ctx.content) {
 						try {
-							await ctx.content.delete(collectionName, itemData.contentId);
+							await ctx.content.delete?.(collectionName, itemData.contentId);
 						} catch (delErr) {
 							ctx.log.warn("Failed to delete orphaned content entry", { contentId: itemData.contentId });
 						}
@@ -347,7 +347,7 @@ export async function fetchAndImportFeed(
 					const itemData = item.data as any;
 					if (itemData.contentId && ctx.content) {
 						try {
-							await ctx.content.delete(collectionName, itemData.contentId);
+							await ctx.content.delete?.(collectionName, itemData.contentId);
 						} catch (delErr) {
 							// Ignore
 						}

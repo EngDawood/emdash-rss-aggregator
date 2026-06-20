@@ -1,0 +1,14 @@
+---
+import FeedList from "./FeedList.astro";
+
+interface Props {
+	node?: {
+		id?: string;
+		limit?: number;
+	};
+}
+
+const { node } = Astro.props;
+---
+
+<FeedList sourceId={node?.id} limit={node?.limit} />

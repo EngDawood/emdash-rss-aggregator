@@ -1,5 +1,5 @@
 /**
- * @dawod/emdash-rss-aggregator
+ * emdash-rss-aggregator
  *
  * RSS/Atom XML feed parser. Uses regex-based XML extraction for compatibility
  * across edge runtimes, Cloudflare Workers, and standard Node.js environments.

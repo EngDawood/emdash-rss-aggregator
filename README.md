@@ -1,6 +1,12 @@
-# @dawod/emdash-rss-aggregator
+# emdash-rss-aggregator
 
-An RSS and Atom feed aggregator plugin for **EmDash CMS** on **Astro**. Automatically import, manage, filter, and display RSS/Atom feed items as first-class CMS content entries.
+[![npm version](https://img.shields.io/npm/v/emdash-rss-aggregator.svg)](https://www.npmjs.com/package/emdash-rss-aggregator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Built with Astro](https://img.shields.io/badge/Built%20with-Astro-ff5d01.svg)](https://astro.build/)
+[![CMS-EmDash](https://img.shields.io/badge/CMS-EmDash-blue.svg)](https://github.com/emdash-cms/emdash)
+[![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg)](https://pnpm.io/)
+
+An RSS and Atom feed aggregator plugin for **[EmDash CMS](https://github.com/emdash-cms/emdash)** on **Astro**. Automatically import, manage, filter, and display RSS/Atom feed items as first-class CMS content entries.
 
 Features both standard aggregation and premium features (like Feed-to-Post conversion, keyword filtering, YouTube detection, and custom audio players).
 
@@ -26,7 +32,7 @@ Features both standard aggregation and premium features (like Feed-to-Post conve
 Install the package via `pnpm` (or npm/yarn):
 
 ```bash
-pnpm add @dawod/emdash-rss-aggregator
+pnpm add emdash-rss-aggregator
 ```
 
 ### Integration Setup
@@ -36,7 +42,7 @@ Add the plugin to your `astro.config.mjs` under the `emdash` integration setting
 ```javascript
 import { defineConfig } from "astro/config";
 import emdash from "emdash";
-import { rssAggregatorPlugin } from "@dawod/emdash-rss-aggregator";
+import { rssAggregatorPlugin } from "emdash-rss-aggregator";
 
 export default defineConfig({
   integrations: [
@@ -64,7 +70,7 @@ Simply import `<FeedList />` in your Astro pages:
 
 ```astro
 ---
-import { FeedList } from "@dawood/emdash-rss-aggregator/astro";
+import { FeedList } from "emdash-rss-aggregator/astro";
 import Layout from "../layouts/Layout.astro";
 ---
 

@@ -18,7 +18,7 @@ import {
 	Tabs,
 	Alert,
 	Loading,
-} from "@emdash-cms/admin";
+} from "./ui";
 import type { Source, SourceStatus, CreateSourceInput, UpdateSourceInput } from "../types";
 import { formatRelativeTime, getStatusVariant, truncateText } from "./shared";
 

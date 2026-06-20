@@ -111,7 +111,7 @@ declare module "emdash" {
 	export interface RouteConfig {
 		public?: boolean;
 		input?: any; // Zod schema
-		handler: (routeCtx: RouteContext, ctx: PluginContext) => Promise<unknown> | unknown;
+		handler: (ctx: RouteContext) => Promise<unknown> | unknown;
 	}
 
 	// ── Plugin Context ─────────────────────────────────────────────────
@@ -128,9 +128,19 @@ declare module "emdash" {
 		email?: EmailAccess;
 	}
 
-	export interface RouteContext<TInput = unknown> {
+	export interface RouteContext<TInput = unknown> extends PluginContext {
 		input: TInput;
 		request: Request;
+		requestMeta?: {
+			ip: string | null;
+			userAgent: string | null;
+			referer: string | null;
+			geo: {
+				country: string | null;
+				region: string | null;
+				city: string | null;
+			} | null;
+		};
 	}
 
 	// ── Storage ────────────────────────────────────────────────────────
@@ -253,4 +263,13 @@ declare module "emdash" {
 
 	// ── definePlugin ────────────────────────────────────────────────────
 	export function definePlugin(config: PluginDefinition): PluginDefinition;
+
+	export class PluginRouteError extends Error {
+		static badRequest(message: string, details?: unknown): PluginRouteError;
+		static unauthorized(message?: string): PluginRouteError;
+		static forbidden(message?: string): PluginRouteError;
+		static notFound(message?: string): PluginRouteError;
+		static conflict(message: string, details?: unknown): PluginRouteError;
+		static internal(message?: string): PluginRouteError;
+	}
 }

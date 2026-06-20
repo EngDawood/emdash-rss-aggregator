@@ -10,7 +10,7 @@ import {
 	Card,
 	Alert,
 	Loading,
-} from "@emdash-cms/admin";
+} from "./ui";
 import type { PluginSettings } from "../types";
 
 export const SettingsPage: React.FC = () => {

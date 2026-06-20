@@ -1,5 +1,5 @@
 /**
- * @dawod/emdash-rss-aggregator
+ * emdash-rss-aggregator
  *
  * Core type definitions for the RSS Aggregator plugin.
  * These types define the data models stored in plugin storage

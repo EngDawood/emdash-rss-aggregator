@@ -11,7 +11,7 @@ import {
 	Alert,
 	Loading,
 	ConfirmDialog,
-} from "@emdash-cms/admin";
+} from "./ui";
 import type { ImportLog, Source } from "../types";
 import { formatRelativeTime, getStatusVariant } from "./shared";
 

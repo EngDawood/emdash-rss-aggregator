@@ -15,7 +15,7 @@ import {
 	Modal,
 	Input,
 	ConfirmDialog,
-} from "@emdash-cms/admin";
+} from "./ui";
 import type { FeedItem, Source, PluginStats } from "../types";
 import { formatRelativeTime, truncateText } from "./shared";
 

@@ -15,7 +15,7 @@ import {
 	Alert,
 	Loading,
 	ConfirmDialog,
-} from "@emdash-cms/admin";
+} from "./ui";
 import type { Display, Source } from "../types";
 
 export const DisplaysPage: React.FC = () => {

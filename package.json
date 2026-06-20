@@ -1,6 +1,6 @@
 {
-	"name": "@dawod/emdash-rss-aggregator",
-	"version": "1.0.1",
+	"name": "emdash-rss-aggregator",
+	"version": "1.1.0",
 	"type": "module",
 	"description": "RSS/Atom feed aggregator plugin for EmDash CMS. Import, manage, and display feed items as first-class content entries.",
 	"author": "Dawood (https://engdawood.com/)",

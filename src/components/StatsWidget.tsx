@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { usePluginAPI, StatGroup, Stat, Loading, Alert } from '@emdash-cms/admin';
+import { usePluginAPI, StatGroup, Stat, Loading, Alert } from './ui';
 import type { PluginStats } from '../types';
 import { formatRelativeTime } from './shared';
 
