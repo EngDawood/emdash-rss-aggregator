@@ -4,13 +4,13 @@
 	"type": "module",
 	"description": "RSS/Atom feed aggregator plugin for EmDash CMS. Import, manage, and display feed items as first-class content entries.",
 	"author": "Dawood (https://engdawood.com/)",
-	"homepage": "https://github.com/EngDawood/emdash-rss-aggregator#readme",
+	"homepage": "https://github.com/emdash-cms/emdash-rss-aggregator#readme",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/EngDawood/emdash-rss-aggregator.git"
+		"url": "git+https://github.com/emdash-cms/emdash-rss-aggregator.git"
 	},
 	"bugs": {
-		"url": "https://github.com/EngDawood/emdash-rss-aggregator/issues"
+		"url": "https://github.com/emdash-cms/emdash-rss-aggregator/issues"
 	},
 	"license": "MIT",
 	"exports": {
