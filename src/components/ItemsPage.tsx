@@ -16,7 +16,7 @@ import {
 	Input,
 	ConfirmDialog,
 } from "./ui";
-import type { FeedItem, Source, PluginStats } from "../types";
+import type { FeedItem, Source, PluginStats, CreditState, OutputProfile } from "../types";
 import { formatRelativeTime, truncateText } from "./shared";
 
 export const ItemsPage: React.FC = () => {
@@ -30,9 +30,16 @@ export const ItemsPage: React.FC = () => {
 
 	// Pagination & filters
 	const [selectedSource, setSelectedSource] = useState<string>("");
+	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [cursor, setCursor] = useState<string | undefined>(undefined);
 	const [hasMore, setHasMore] = useState(false);
 	const [totalItems, setTotalItems] = useState(0);
+
+	// AI credits
+	const [credits, setCredits] = useState<CreditState | null>(null);
+
+	// Per-row busy state for approve / AI actions
+	const [busyId, setBusyId] = useState<string | null>(null);
 
 	// Rejection states
 	const [rejectingItem, setRejectingItem] = useState<{ id: string; title: string } | null>(null);
@@ -40,21 +47,40 @@ export const ItemsPage: React.FC = () => {
 	const [isRejectLoading, setIsRejectLoading] = useState(false);
 
 	// Delete state
+	const [sourcesMap, setSourcesMap] = useState<Record<string, Source>>({});
+	const [profilesMap, setProfilesMap] = useState<Record<string, OutputProfile>>({});
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 
 	const loadInitialData = async () => {
 		try {
 			setLoading(true);
-			// Fetch sources for dropdown filter
-			const sourcesData = await api.get<{ items: Array<{ id: string } & Source> }>("sources");
+			// Fetch sources and output profiles
+			const [sourcesData, profilesData] = await Promise.all([
+				api.get<{ items: Array<{ id: string } & Source> }>("sources"),
+				api.get<{ items: Array<{ id: string } & OutputProfile> }>("output-profiles").catch(() => ({ items: [] })),
+			]);
 			setSources(sourcesData.items.map((s) => ({ id: s.id, name: s.name })));
+			const sMap: Record<string, Source> = {};
+			for (const s of sourcesData.items) sMap[s.id] = s;
+			setSourcesMap(sMap);
+			const pMap: Record<string, OutputProfile> = {};
+			for (const p of profilesData.items) pMap[p.id] = p;
+			setProfilesMap(pMap);
 
 			// Fetch stats
 			const statsData = await api.get<PluginStats>("stats");
 			setStats(statsData);
 
+			// Fetch AI credits (best-effort)
+			try {
+				const creditData = await api.get<CreditState>("credits");
+				setCredits(creditData);
+			} catch {
+				// credits endpoint is optional; ignore failures
+			}
+
 			// Fetch items
-			await fetchItems("", undefined, true);
+			await fetchItems("", "", undefined, true);
 			setError(null);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load initial data");
@@ -63,11 +89,12 @@ export const ItemsPage: React.FC = () => {
 		}
 	};
 
-	const fetchItems = async (sourceId: string, cursorVal?: string, reset: boolean = false) => {
+	const fetchItems = async (sourceId: string, statusVal: string, cursorVal?: string, reset: boolean = false) => {
 		setLoadingItems(true);
 		try {
 			let url = "items?limit=25";
 			if (sourceId) url += `&sourceId=${encodeURIComponent(sourceId)}`;
+			if (statusVal) url += `&status=${encodeURIComponent(statusVal)}`;
 			if (cursorVal) url += `&cursor=${encodeURIComponent(cursorVal)}`;
 
 			const data = await api.get<{
@@ -98,12 +125,70 @@ export const ItemsPage: React.FC = () => {
 
 	const handleSourceChange = (sourceId: string) => {
 		setSelectedSource(sourceId);
-		fetchItems(sourceId, undefined, true);
+		fetchItems(sourceId, statusFilter, undefined, true);
+	};
+
+	const handleStatusChange = (status: string) => {
+		setStatusFilter(status);
+		fetchItems(selectedSource, status, undefined, true);
 	};
 
 	const handleLoadMore = () => {
 		if (hasMore && cursor) {
-			fetchItems(selectedSource, cursor, false);
+			fetchItems(selectedSource, statusFilter, cursor, false);
+		}
+	};
+
+	const handleApprove = async (id: string) => {
+		setBusyId(id);
+		try {
+			const res = await api.post<{ item: FeedItem }>("items/approve", { id });
+			setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...res.item } : i)));
+		} catch (err) {
+			alert(err instanceof Error ? err.message : "Failed to approve item");
+		} finally {
+			setBusyId(null);
+		}
+	};
+
+	const handlePublish = async (id: string) => {
+		setBusyId(id);
+		try {
+			const res = await api.post<{ item: FeedItem; publishedContentId?: string }>("items/publish", { id });
+			setItems((prev) =>
+				prev.map((i) =>
+					i.id === id
+						? {
+								...i,
+								...res.item,
+								publishedContentId: res.publishedContentId ?? res.item?.publishedContentId ?? i.publishedContentId,
+							}
+						: i
+				)
+			);
+		} catch (err) {
+			alert(err instanceof Error ? err.message : "Publish failed");
+		} finally {
+			setBusyId(null);
+		}
+	};
+
+	const handleAi = async (id: string) => {
+		setBusyId(id);
+		try {
+			const res = await api.post<{ item: FeedItem }>("items/ai", { id });
+			setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...res.item } : i)));
+			// Refresh credits after AI usage
+			try {
+				const creditData = await api.get<CreditState>("credits");
+				setCredits(creditData);
+			} catch {
+				/* ignore */
+			}
+		} catch (err) {
+			alert(err instanceof Error ? err.message : "AI action failed");
+		} finally {
+			setBusyId(null);
 		}
 	};
 
@@ -198,13 +283,59 @@ export const ItemsPage: React.FC = () => {
 			),
 		},
 		{
+			key: "status",
+			label: "Status",
+			render: (val: any, row: any) => {
+				const s = (val as string) || "approved";
+				return (
+					<div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+						<div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+							<Badge variant={s === "approved" ? "success" : s === "pending" ? "warning" : "error"}>{s}</Badge>
+							{row.publishedContentId && (() => {
+								const src = sourcesMap[row.sourceId];
+								const prof = src?.outputProfileId ? profilesMap[src.outputProfileId] : null;
+								const col = prof?.collection || "posts";
+								return (
+									<a
+										href={`/_emdash/admin/content/${col}/${row.publishedContentId}`}
+										target="_blank"
+										rel="noreferrer"
+										style={{ textDecoration: "none" }}
+										title="View published CMS entry"
+									>
+										<span style={{ cursor: "pointer" }}><Badge variant="info">Published ↗</Badge></span>
+									</a>
+								);
+							})()}
+						</div>
+						{row.summary && (
+							<span style={{ fontSize: "10px", color: "#2563eb" }}>TL;DR ✓</span>
+						)}
+						{row.rewrittenContent && (
+							<span style={{ fontSize: "10px", color: "#7c3aed" }}>Rewritten ✓</span>
+						)}
+					</div>
+				);
+			},
+		},
+		{
 			key: "actions",
 			label: "Actions",
-			width: "220px",
+			width: "320px",
 			render: (_: any, row: any) => (
-				<div style={{ display: "flex", gap: "6px" }}>
-					<Button variant="secondary" size="sm" onClick={() => window.open(row.url, "_blank")}>
-						Visit Link
+				<div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+					{row.status === "pending" && (
+						<Button variant="primary" size="sm" loading={busyId === row.id} onClick={() => handleApprove(row.id)}>
+							Approve
+						</Button>
+					)}
+					{row.status === "approved" && !row.publishedContentId && (
+						<Button variant="primary" size="sm" loading={busyId === row.id} onClick={() => handlePublish(row.id)}>
+							Publish
+						</Button>
+					)}
+					<Button variant="secondary" size="sm" loading={busyId === row.id} onClick={() => handleAi(row.id)}>
+						Re-run AI
 					</Button>
 					<Button variant="ghost" size="sm" onClick={() => handleOpenReject({ id: row.id, title: row.title })}>
 						Reject
@@ -237,7 +368,26 @@ export const ItemsPage: React.FC = () => {
 					<StatGroup>
 						<Stat label="Total Imported Items" value={stats?.totalItems ?? totalItems} />
 						<Stat label="Imported Today" value={stats?.itemsToday ?? 0} />
+						{credits && (
+							<Stat
+								label="AI Credits Used"
+								value={credits.limit > 0 ? `${credits.used} / ${credits.limit}` : `${credits.used} / ∞`}
+							/>
+						)}
 					</StatGroup>
+				</div>
+				<div style={{ width: "200px" }}>
+					<Select
+						label="Filter by Status"
+						value={statusFilter}
+						onChange={handleStatusChange}
+						options={[
+							{ label: "All Statuses", value: "" },
+							{ label: "Pending", value: "pending" },
+							{ label: "Approved", value: "approved" },
+							{ label: "Rejected", value: "rejected" },
+						]}
+					/>
 				</div>
 				<div style={{ width: "240px" }}>
 					<Select

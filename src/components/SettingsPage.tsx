@@ -227,37 +227,6 @@ export const SettingsPage: React.FC = () => {
 					</div>
 				</Card>
 
-				{/* 4. Feed-to-Post */}
-				<Card title="Feed-to-Post Integration (Pro)">
-					<div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-						<Toggle
-							label="Enable Feed-to-Post Globally"
-							checked={settings.enableFeedToPost}
-							onChange={(val) => updateSetting("enableFeedToPost", val)}
-							description="Allow automatic generation of CMS blog posts from feeds."
-						/>
-						{settings.enableFeedToPost && (
-							<>
-								<Input
-									label="Default Destination Collection"
-									value={settings.defaultPostCollection}
-									onChange={(val) => updateSetting("defaultPostCollection", val)}
-									description="E.g. posts, blog, articles"
-								/>
-								<Select
-									label="Default Post Status"
-									value={settings.defaultPostStatus}
-									onChange={(val) => updateSetting("defaultPostStatus", val)}
-									options={[
-										{ label: "Draft", value: "draft" },
-										{ label: "Published", value: "published" },
-									]}
-								/>
-							</>
-						)}
-					</div>
-				</Card>
-
 				{/* 5. Crawler Capabilities */}
 				<Card title="Advanced Settings" className="col-span-2">
 					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -286,7 +255,70 @@ export const SettingsPage: React.FC = () => {
 								checked={settings.defaultNofollow}
 								onChange={(val) => updateSetting("defaultNofollow", val)}
 							/>
+							<NumberInput
+								label="Full-text Min Words Threshold"
+								value={settings.fullTextMinWords}
+								onChange={(val) => updateSetting("fullTextMinWords", val)}
+								min={0}
+								description="Only scrape full text when item is shorter than this. 0 = always when enabled."
+							/>
 						</div>
+					</div>
+				</Card>
+
+				{/* 6. AI Pipeline */}
+				<Card title="AI Pipeline">
+					<div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+						<Toggle
+							label="Enable AI Pipeline"
+							checked={settings.aiEnabled}
+							onChange={(val) => updateSetting("aiEnabled", val)}
+							description="Master switch for models, agents and output profiles. Configure them on the AI page."
+						/>
+						<NumberInput
+							label="Monthly AI Credit Limit"
+							value={settings.aiCreditMonthlyLimit}
+							onChange={(val) => updateSetting("aiCreditMonthlyLimit", val)}
+							min={0}
+							description="Max AI operations per month. 0 = unlimited."
+						/>
+					</div>
+				</Card>
+
+				{/* 8. Image Import to Media Library */}
+				<Card title="Image Import to Media Library">
+					<div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+						<Toggle
+							label="Import Featured Images"
+							checked={settings.imageImportEnabled}
+							onChange={(val) => updateSetting("imageImportEnabled", val)}
+							description="Download featured images into media storage (R2/local)."
+						/>
+						<Toggle
+							label="Import In-content Images"
+							checked={settings.imageImportContentImages}
+							onChange={(val) => updateSetting("imageImportContentImages", val)}
+							description="Also download embedded images and rewrite their URLs."
+						/>
+						<NumberInput
+							label="Max Images per Item"
+							value={settings.imageImportMaxPerItem}
+							onChange={(val) => updateSetting("imageImportMaxPerItem", val)}
+							min={1}
+							max={50}
+						/>
+					</div>
+				</Card>
+
+				{/* 9. Manual Curation */}
+				<Card title="Manual Curation">
+					<div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+						<Toggle
+							label="Require Manual Approval"
+							checked={settings.curationEnabled}
+							onChange={(val) => updateSetting("curationEnabled", val)}
+							description="Import items into a pending queue requiring approval before they go live."
+						/>
 					</div>
 				</Card>
 			</div>

@@ -47,10 +47,10 @@ export function PageHeader({ title, description, actions }: {
 }
 
 const BUTTON_STYLES: Record<string, React.CSSProperties> = {
-	primary: { background: "#2563eb", color: "#fff", border: "none" },
-	secondary: { background: "#f3f4f6", color: "#111", border: "1px solid #d1d5db" },
-	danger: { background: "#dc2626", color: "#fff", border: "none" },
-	ghost: { background: "transparent", color: "#374151", border: "1px solid #d1d5db" },
+	primary: { background: "var(--color-accent, #B85A3A)", color: "var(--color-on-accent, #F8F4EA)", border: "none" },
+	secondary: { background: "var(--color-bg-subtle, #f3f4f6)", color: "var(--color-text, #111)", border: "1px solid var(--color-border-subtle, #d1d5db)" },
+	danger: { background: "var(--color-danger, #dc2626)", color: "#fff", border: "none" },
+	ghost: { background: "transparent", color: "var(--color-text, #374151)", border: "1px solid var(--color-border-subtle, #d1d5db)" },
 };
 
 const BUTTON_SIZE: Record<string, React.CSSProperties> = {
@@ -189,8 +189,8 @@ function FieldLabel({ label, description }: { label?: string; description?: stri
 const INPUT_BASE: React.CSSProperties = {
 	width: "100%", boxSizing: "border-box",
 	padding: "7px 10px", fontSize: "14px",
-	border: "1px solid #d1d5db", borderRadius: "6px",
-	background: "#fff", color: "#111",
+	border: "1px solid var(--color-border, #d1d5db)", borderRadius: "6px",
+	background: "var(--color-bg, #fff)", color: "var(--color-text, #111)",
 };
 
 export function Input({ label, value, onChange, placeholder, description, type = "text" }: {
@@ -209,16 +209,17 @@ export function Input({ label, value, onChange, placeholder, description, type =
 	);
 }
 
-export function TextArea({ label, value, onChange, rows = 4, placeholder }: {
+export function TextArea({ label, value, onChange, rows = 4, placeholder, description }: {
 	label?: string;
 	value: string;
 	onChange: (val: string) => void;
 	rows?: number;
 	placeholder?: string;
+	description?: string;
 }) {
 	return (
 		<div>
-			<FieldLabel label={label} />
+			<FieldLabel label={label} description={description} />
 			<textarea value={value} rows={rows} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...INPUT_BASE, resize: "vertical" }} />
 		</div>
 	);
@@ -236,7 +237,7 @@ export function NumberInput({ label, value, onChange, min, max, description }: {
 		<div>
 			<FieldLabel label={label} description={description} />
 			<input
-				type="number" value={value} min={min} max={max}
+				type="number" value={value} min={min} max={max} step="any"
 				onChange={(e) => onChange(Number(e.target.value))}
 				style={INPUT_BASE}
 			/>
