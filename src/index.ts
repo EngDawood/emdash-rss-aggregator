@@ -1,5 +1,5 @@
 /**
- * emdash-rss-aggregator
+ * @dawod/emdash-rss-aggregator
  *
  * Plugin descriptor factory — imported in `astro.config.mjs` at build time.
  * This file must be side-effect-free.
@@ -23,7 +23,7 @@ export interface RssAggregatorOptions {
  *
  * Usage in `astro.config.mjs`:
  * ```ts
- * import { rssAggregatorPlugin } from "emdash-rss-aggregator";
+ * import { rssAggregatorPlugin } from "@dawod/emdash-rss-aggregator";
  *
  * export default defineConfig({
  *   integrations: [
@@ -39,9 +39,9 @@ export function rssAggregatorPlugin(options: RssAggregatorOptions = {}): PluginD
 		id: "rss-aggregator",
 		version: "1.0.0",
 		format: "native",
-		entrypoint: "emdash-rss-aggregator/sandbox",
-		componentsEntry: "emdash-rss-aggregator/astro",
-		adminEntry: "emdash-rss-aggregator/admin",
+		entrypoint: "@dawod/emdash-rss-aggregator/sandbox",
+		componentsEntry: "@dawod/emdash-rss-aggregator/astro",
+		adminEntry: "@dawod/emdash-rss-aggregator/admin",
 		options: options as any,
 		capabilities: [
 			"read:content",
@@ -67,6 +67,15 @@ export function rssAggregatorPlugin(options: RssAggregatorOptions = {}): PluginD
 			displays: {
 				indexes: ["name"],
 			},
+			models: {
+				indexes: ["createdAt"],
+			},
+			agents: {
+				indexes: ["kind", "createdAt"],
+			},
+			outputProfiles: {
+				indexes: ["createdAt"],
+			},
 			rejectList: {
 				indexes: ["guid", "sourceId", "createdAt"],
 			},
@@ -80,7 +89,9 @@ export function rssAggregatorPlugin(options: RssAggregatorOptions = {}): PluginD
 		adminPages: [
 			{ path: "/sources", label: "Feed Sources", icon: "rss" },
 			{ path: "/items", label: "Feed Items", icon: "list" },
+			{ path: "/reader", label: "Feed Reader", icon: "book-open" },
 			{ path: "/displays", label: "Displays", icon: "layout" },
+			{ path: "/ai", label: "AI", icon: "sparkles" },
 			{ path: "/logs", label: "Import Log", icon: "file-text" },
 			{ path: "/settings", label: "Settings", icon: "settings" },
 		],

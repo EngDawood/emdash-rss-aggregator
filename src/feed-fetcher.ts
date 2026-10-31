@@ -1,5 +1,5 @@
 /**
- * emdash-rss-aggregator
+ * @dawod/emdash-rss-aggregator
  *
  * Import pipeline that fetches feed, parses items, filters them,
  * deduplicates against database, and syncs them to storage and content collections.
@@ -15,17 +15,16 @@ import type {
 	ParsedItem,
 	MediaType,
 	AuthorInfo,
-	Enclosure,
 } from "./types.js";
 import { parseFeed, extractYouTubeVideoId } from "./feed-parser.js";
-
-// ── Helpers ────────────────────────────────────────────────────────────
-
-function generateId(prefix: string = ""): string {
-	const timestamp = Date.now().toString(36);
-	const random = Math.random().toString(36).slice(2, 10);
-	return prefix ? `${prefix}_${timestamp}${random}` : `${timestamp}${random}`;
-}
+import { fetchFullText } from "./full-text.js";
+import { importImages } from "./image-importer.js";
+import { applyFieldMappings } from "./field-mapper.js";
+import { applyAgents } from "./ai-service.js";
+import { publishItem, writeContentEntry } from "./output.js";
+import { generateId, outputProfiles } from "./utils.js";
+import { htmlToPortableText } from "./html-parser.js";
+import type { OutputProfile } from "./types.js";
 
 export function applyKeywordFilter(items: ParsedItem[], source: Source): ParsedItem[] {
 	if (!source.keywordFilterEnabled || !source.keywords || source.keywords.length === 0) {
@@ -98,6 +97,8 @@ export async function fetchAndImportFeed(
 	let itemsRejected = 0;
 	let itemsUpdated = 0;
 	let feedTitle: string | undefined;
+	/** Items that imported into storage but never reached the CMS. */
+	const cmsFailures: string[] = [];
 
 	// Type cast collections
 	const rejectList = ctx.storage.rejectList as StorageCollection<RejectListEntry>;
@@ -152,7 +153,7 @@ export async function fetchAndImportFeed(
 		itemsRejected = preRejectCount - filteredItems.length;
 
 		// 5. Load existing items for this source to deduplicate
-		const existingItems = new Map<string, { id: string; contentId?: string }>();
+		const existingItems = new Map<string, { id: string; contentId?: string; publishedContentId?: string }>();
 		let itemCursor: string | undefined;
 		do {
 			const res = await feedItems.query({
@@ -163,7 +164,7 @@ export async function fetchAndImportFeed(
 			for (const item of res.items) {
 				const key = source.uniqueBy === "title" ? item.data.title : item.data.guid;
 				if (key) {
-					existingItems.set(key, { id: item.id, contentId: (item.data as any).contentId });
+					existingItems.set(key, { id: item.id, contentId: (item.data as any).contentId, publishedContentId: (item.data as any).publishedContentId });
 				}
 			}
 			itemCursor = res.cursor;
@@ -189,7 +190,7 @@ export async function fetchAndImportFeed(
 			}
 
 			// Generate excerpt
-			const excerpt = generateExcerpt(parsed.description || parsed.content || "", 40);
+			let excerpt = generateExcerpt(parsed.description || parsed.content || "", 40);
 
 			// Extract image
 			let imageUrl: string | undefined;
@@ -227,7 +228,69 @@ export async function fetchAndImportFeed(
 				authorInfo.name = source.fallbackAuthor;
 			}
 
-			const feedItemData = {
+			// ── Full Text RSS (premium) ──────────────────────────────────
+			// For excerpt-only feeds, scrape the full article from the source page.
+			if (source.enableFullText && settings.enableFullText && parsed.link) {
+				const wordCount = content ? content.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length : 0;
+				if (settings.fullTextMinWords <= 0 || wordCount < settings.fullTextMinWords) {
+					try {
+						const full = await fetchFullText(ctx, settings, parsed.link);
+						if (full) {
+							content = source.trimContent && source.contentMaxWords > 0
+								? trimContentToWords(full, source.contentMaxWords)
+								: full;
+							excerpt = generateExcerpt(content, 40);
+						}
+					} catch (ftErr) {
+						ctx.log.warn("Full-text fetch failed", { guid: parsed.guid, error: String(ftErr) });
+					}
+				}
+			}
+
+			// ── Image Import to Media Library (premium) ──────────────────
+			let mediaIds: string[] = [];
+			const doImages = source.importImages ?? settings.imageImportEnabled;
+			if (doImages) {
+				try {
+					const imgRes = await importImages(ctx, settings, {
+						featuredImageUrl: imageUrl,
+						content,
+						importContentImages: settings.imageImportContentImages,
+					});
+					content = imgRes.content;
+					if (imgRes.featuredUrl) imageUrl = imgRes.featuredUrl;
+					mediaIds = imgRes.mediaIds;
+				} catch (imgErr) {
+					ctx.log.warn("Image import failed", { guid: parsed.guid, error: String(imgErr) });
+				}
+			}
+
+			// ── Custom Field Mapping (premium) ───────────────────────────
+			const customFields = applyFieldMappings(source.fieldMappings, parsed);
+
+			// ── AI Pipeline ──────────────────────────────────────────────
+			// Run the feed's bound agents on its bound model. applyAgents is
+			// defensive: returns {} when AI is off, unbound, or out of credits.
+			const aiInput = { title: parsed.title, content, excerpt } as unknown as FeedItem;
+			const aiFields = await applyAgents(ctx, settings, {
+				item: aiInput,
+				modelId: source.aiModelId,
+				agentIds: source.aiAgentIds,
+			});
+			const summary = aiFields.summary;
+			const rewrittenContent = aiFields.rewrittenContent;
+			const translations = aiFields.translations;
+			const aiOutputs = aiFields.aiOutputs;
+			const aiProcessedAt = aiFields.aiProcessedAt;
+
+			// ── Output profile + approval gate ───────────────────────────
+			const profile = source.outputProfileId
+				? ((await outputProfiles(ctx).get(source.outputProfileId)) as OutputProfile | null)
+				: null;
+			const requireApproval = profile?.requireApproval ?? source.requireApproval ?? settings.curationEnabled;
+			const status: "pending" | "approved" = requireApproval ? "pending" : "approved";
+
+			const feedItemData: FeedItem = {
 				sourceId,
 				sourceName: source.name,
 				sourceUrl: source.url,
@@ -245,55 +308,88 @@ export async function fetchAndImportFeed(
 				audioUrl,
 				categories: parsed.categories,
 				importedAt: now,
+				status,
+				approvedAt: status === "approved" ? now : undefined,
+				summary,
+				rewrittenContent,
+				aiOutputs,
+				aiProcessedAt,
+				translations,
+				mediaIds: mediaIds.length ? mediaIds : undefined,
+				customFields: Object.keys(customFields).length ? customFields : undefined,
 			};
+
+			// Content entry payload. Every key here becomes a literal SQL column
+			// on the target collection, so keep it to the stock entry shape plus
+			// whatever the source's Custom Mapping produced — unknown columns are
+			// stripped (and logged) by writeContentEntry rather than losing the row.
+			const contentPayload: Record<string, unknown> = {
+				title: parsed.title,
+				status: "published",
+				publishedAt: parsed.pubDate || now,
+				content: htmlToPortableText(content),
+				seo: {
+					title: parsed.title,
+					description: excerpt,
+					image: imageUrl ?? null,
+					canonical: parsed.link ?? null,
+					noIndex: false,
+				},
+			};
+
+			for (const [key, val] of Object.entries(customFields)) {
+				if (typeof val === "string" && (/<[a-z][\s\S]*>/i.test(val) || key.includes("description") || key.includes("content"))) {
+					contentPayload[key] = htmlToPortableText(val);
+				} else {
+					contentPayload[key] = val;
+				}
+			}
 
 			let targetItemId = existing ? existing.id : generateId("itm");
 			let contentId = existing?.contentId;
 
 			// Write content entry
-			if (ctx.content) {
+			if (ctx.content?.create && ctx.content?.update) {
 				try {
-					if (contentId) {
-						// Update CMS entry
-						await ctx.content.update?.(collectionName, contentId, feedItemData);
-					} else {
-						// Create CMS entry
-						const contentEntry = await ctx.content.create?.(collectionName, feedItemData);
-						contentId = contentEntry?.id;
+					const written = await writeContentEntry(ctx, collectionName, contentPayload, contentId);
+					contentId = written.contentId;
+					if (contentId && (ctx.content as any).publish) {
+						try {
+							await (ctx.content as any).publish(collectionName, contentId, { publishedAt: contentPayload.publishedAt });
+						} catch (pubErr) {
+							// Ignore
+						}
 					}
 				} catch (contentErr) {
-					ctx.log.warn("Failed to sync content entry for feed item", { guid: parsed.guid, error: String(contentErr) });
+					const msg = String(contentErr);
+					cmsFailures.push(`sync "${parsed.title}" → ${collectionName}: ${msg}`);
+					ctx.log.warn("Failed to sync content entry for feed item", { guid: parsed.guid, error: msg });
 				}
 			}
 
-			// Feed to Post conversion (premium)
-			if (source.feedToPost && source.postCollection && ctx.content) {
-				try {
-					const postData = {
-						title: parsed.title,
-						content,
-						excerpt,
-						publishedAt: parsed.pubDate || now,
-						status: source.postStatus || "draft",
-						author: authorInfo.name,
-						featuredImage: imageUrl,
-						meta: {
-							rssSourceId: sourceId,
-							rssSourceUrl: source.url,
-							rssGuid: parsed.guid,
-						},
-					};
-					// Create content in custom postCollection
-					await ctx.content.create?.(source.postCollection, postData);
-				} catch (postErr) {
-					ctx.log.warn("Failed to create post content for Feed-to-Post", { guid: parsed.guid, collection: source.postCollection, error: String(postErr) });
+			// Publish via the output profile. Auto-publish only for approved
+			// items; items pending approval are published later by items/approve.
+			// Idempotent: reuse the prior published post id to update, not duplicate.
+			let publishedContentId = existing?.publishedContentId;
+			if (status === "approved" && profile && profile.mode === "publish") {
+				const result = await publishItem(ctx, settings, {
+					source,
+					item: { ...feedItemData, contentId },
+					profile,
+					existingContentId: publishedContentId,
+				});
+				if (result.action === "created") publishedContentId = result.contentId;
+				else if (result.action === "skipped") {
+					cmsFailures.push(`publish "${parsed.title}" → ${profile.collection}: ${result.error || "unknown reason"}`);
+					ctx.log.warn("Publish skipped", { guid: parsed.guid, error: result.error });
 				}
 			}
 
 			// Store feed item in plugin storage
-			const storedItem: FeedItem & { contentId?: string } = {
+			const storedItem: FeedItem = {
 				...feedItemData,
 				contentId,
+				publishedContentId,
 			};
 			await feedItems.put(targetItemId, storedItem);
 
@@ -377,12 +473,18 @@ export async function fetchAndImportFeed(
 		const log: ImportLog = {
 			sourceId,
 			sourceName: source.name,
-			status: "success",
+			status: cmsFailures.length > 0 ? "partial" : "success",
 			itemsFound,
 			itemsImported,
 			itemsSkipped,
 			itemsRejected,
 			itemsUpdated,
+			// A CMS write that fails leaves the item in plugin storage but invisible
+			// on the site. Report it here — a log-only warning went unnoticed for weeks.
+			error:
+				cmsFailures.length > 0
+					? `${cmsFailures.length} item(s) did not reach the CMS. First: ${cmsFailures[0]}`
+					: undefined,
 			duration,
 			feedTitle,
 			feedUrl: source.url,
@@ -390,7 +492,7 @@ export async function fetchAndImportFeed(
 		};
 		await importLogs.put(logId, log);
 
-		ctx.log.info("Finished feed import", { sourceId, name: source.name, imported: itemsImported, duration });
+		ctx.log.info("Finished feed import", { sourceId, name: source.name, imported: itemsImported, cmsFailures: cmsFailures.length, duration });
 		return log;
 	} catch (err: any) {
 		const duration = Date.now() - start;
